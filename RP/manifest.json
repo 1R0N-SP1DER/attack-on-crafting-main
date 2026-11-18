@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Attack on Crafting RP",
+    "description": "Attack on Titan - resource pack",
+    "uuid": "9bd82a65-1641-4c24-8f01-e639542a3817",
+    "version": [
+      0,
+      0,
+      1
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      100
+    ]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "22eca398-d633-4d64-b033-f737e1b76ab8",
+      "version": [
+        0,
+        0,
+        1
+      ]
+    }
+  ]
+}

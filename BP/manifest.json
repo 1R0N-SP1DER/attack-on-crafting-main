@@ -1,0 +1,39 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Attack on Crafting BP",
+    "description": "Attack on Titan - behavior pack",
+    "uuid": "c39f7705-521d-4da7-8ec3-cb7db99bb3ed",
+    "version": [
+      0,
+      0,
+      1
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      100
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "7505111b-baed-4799-944d-454b2da8bad3",
+      "version": [
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "9bd82a65-1641-4c24-8f01-e639542a3817",
+      "version": [
+        0,
+        0,
+        1
+      ]
+    }
+  ]
+}
