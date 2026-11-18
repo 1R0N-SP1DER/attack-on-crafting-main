@@ -1,0 +1,99 @@
+{
+ "format_version": "1.8.0",
+ "animations": {
+  "animation.aot.aoc_blades.3rd_person": {
+   "loop": false,
+   "bones": {
+    "Right Arm": {
+     "rotation": {
+      "0.0": [
+       -2.5,
+       0,
+       0.0
+      ]
+     }
+    },
+    "Left Arm": {
+     "rotation": {
+      "0.0": [
+       0,
+       0,
+       0.0
+      ]
+     }
+    }
+   }
+  },
+  "animation.aot.aoc_blades.first_person": {
+   "loop": false,
+   "bones": {
+    "Right Arm": {
+     "rotation": {
+      "0.0": [
+       10.0374230459,
+       4.9238497548,
+       0.87038
+      ]
+     },
+     "position": {
+      "0.0": [
+       3.0,
+       10.0,
+       -1.0
+      ]
+     }
+    },
+    "Left Arm": {
+     "rotation": {
+      "0.0": [
+       10.0374230459,
+       -4.9238497548,
+       -0.87038
+      ]
+     },
+     "position": {
+      "0.0": [
+       -3.0,
+       10.0,
+       -1.0
+      ]
+     }
+    },
+    "leftblade": {
+     "rotation": {
+      "0.0": [
+       0,
+       7.5,
+       0.0
+      ]
+     }
+    },
+    "rightblade": {
+     "rotation": {
+      "0.0": [
+       0,
+       -7.5,
+       0.0
+      ]
+     }
+    },
+    "main": {
+     "rotation": {
+      "0.0": [
+       0,
+       -90.0,
+       0.0
+      ]
+     },
+     "position": {
+      "0.0": [
+       6.0,
+       -3.0,
+       0.0
+      ]
+     }
+    }
+   }
+  }
+ }
+}
