@@ -45,6 +45,35 @@ const WEAK = {
   healPerSecond: 50,         // titans heal quickly so nothing but a nape hit kills
 };
 
+// Debug: draws the weak-point zones as bright red dots around titans that have them.
+// Toggle in game with:  /scriptevent aot:debug on   or   /scriptevent aot:debug off
+let DEBUG_ZONES = true;
+system.afterEvents.scriptEventReceive.subscribe((ev) => {
+  if (ev.id !== "aot:debug") return;
+  DEBUG_ZONES = ev.message.trim().toLowerCase() !== "off";
+  safe(() => world.sendMessage(`[AoT] weak point debug ${DEBUG_ZONES ? "ON" : "OFF"}`));
+});
+
+function drawZones() {
+  if (!DEBUG_ZONES) return;
+  for (const dn of DIMS) {
+    for (const t of safe(() => dimOf(dn).getEntities({ type: ATTACK })) ?? []) {
+      const cfg = TITANS[ATTACK], c = t.location, r = cfg.radius + 0.6;
+      const yaw = (t.getRotation().y * Math.PI) / 180;
+      const fwd = { x: -Math.sin(yaw), z: Math.cos(yaw) }, rgt = { x: -fwd.z, z: fwd.x };
+      const dot = (deg, f) => {
+        const a = (deg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
+        safe(() => t.dimension.spawnParticle("aot:debug_point", { x: c.x + (fwd.x * ca + rgt.x * sa) * r, y: c.y + f * cfg.height, z: c.z + (fwd.z * ca + rgt.z * sa) * r }));
+      };
+      const band = (lo, hi, n) => Array.from({ length: n }, (_, i) => lo + ((hi - lo) * i) / (n - 1));
+      for (const f of band(WEAK.napeBand[0], WEAK.napeBand[1], 4)) for (const d of band(110, 250, 8)) dot(d, f);   // nape: back
+      for (const f of band(WEAK.eyeBand[0], WEAK.eyeBand[1], 4)) for (const d of band(-70, 70, 8)) dot(d, f);     // eyes: front
+      for (const f of band(0.02, WEAK.heelMax, 3)) for (const d of [70, 100, 130, 160, 200, 230, 260, 290]) dot(d, f); // heels: back/sides
+    }
+  }
+}
+system.runInterval(drawZones, 4);
+
 const busyUntil = new Map();   // titan id -> tick it may act again
 const legInjury = new Map();   // titan id -> { left: tick, right: tick }
 const lastSeen = new Map();    // Lara/Eren id -> { dim, location, yaw }

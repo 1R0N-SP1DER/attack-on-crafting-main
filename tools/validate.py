@@ -104,7 +104,7 @@ for p in ROOT.glob("BP/scripts/**/*.js"):
     for sid in re.findall(r'"(aot\.[a-z0-9_]+)"', txt):
         if sid not in snd:
             errors.append(f"{p.name}: sound event {sid} not in sound_definitions.json")
-    for pid in re.findall(r'"(stk:[a-z0-9_]+)"', txt):
+    for pid in re.findall(r'"((?:stk:[a-z0-9_]+)|(?:aot:debug_point))"', txt):
         if pid not in part_ids:
             errors.append(f"{p.name}: particle {pid} not found in RP/particles")
 bpm = load(ROOT / "BP/manifest.json") or {}
