@@ -9,7 +9,7 @@ Loose .particle.json / animation controller / animation json files in models/ ar
 to the matching RP folder. Duplicate models (same geometry id) are skipped and reported.
 Usage: python3 tools/export_bbmodels.py
 """
-import base64, json, re, sys
+import base64, hashlib, json, re, shutil, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -181,6 +181,58 @@ def write(path, obj):
     path.write_text(json.dumps(obj, indent=1))
 
 
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def export_assets(report):
+    """Sounds (mp3/m4a/wav -> mono ogg) and pack icon (-> 256x256 png). Re-encodes only when the
+    source file changed (hash stamps), so the CI diff check stays stable."""
+    stamp_file = RP / "sounds" / ".source_hashes.json"
+    stamps = json.loads(stamp_file.read_text()) if stamp_file.exists() else {}
+    defs = {}
+    for f in sorted(SRC.glob("*")):
+        if f.suffix.lower() not in (".mp3", ".m4a", ".wav", ".ogg"):
+            continue
+        s = slug(f.stem)
+        out = RP / "sounds" / NS / f"{s}.ogg"
+        h = sha(f)
+        if stamps.get(s) != h or not out.exists():
+            if not shutil.which("ffmpeg"):
+                report.append(f"NO FFMPEG: cannot convert {f.name}")
+                continue
+            out.parent.mkdir(parents=True, exist_ok=True)
+            r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(f), "-ac", "1", "-c:a", "libvorbis", "-q:a", "4", str(out)])
+            if r.returncode:
+                report.append(f"FAILED to convert {f.name}")
+                continue
+            stamps[s] = h
+        defs[f"{NS}.{s}"] = {"category": "neutral", "max_distance": 64, "sounds": [{"name": f"sounds/{NS}/{s}", "volume": 1.0}]}
+        report.append(f"SOUND {f.name} -> sounds/{NS}/{s}.ogg (event {NS}.{s})")
+    if defs:
+        write(RP / "sound_definitions.json", {"format_version": "1.14.0", "sound_definitions": defs})
+        stamp_file.parent.mkdir(parents=True, exist_ok=True)
+        stamp_file.write_text(json.dumps(stamps, indent=1, sort_keys=True))
+    for ic in sorted(SRC.glob("pack_icon.*")):
+        out = RP / "pack_icon.png"
+        h = sha(ic)
+        if stamps.get("pack_icon") != h or not out.exists():
+            from PIL import Image
+            im = Image.open(ic).convert("RGB")
+            w, h2 = im.size
+            m = min(w, h2)
+            im = im.crop(((w - m) // 2, (h2 - m) // 2, (w - m) // 2 + m, (h2 - m) // 2 + m)).resize((256, 256), Image.LANCZOS)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            im.save(out)
+            stamps["pack_icon"] = h
+            stamp_file.parent.mkdir(parents=True, exist_ok=True)
+            stamp_file.write_text(json.dumps(stamps, indent=1, sort_keys=True))
+        (ROOT / "BP").mkdir(exist_ok=True)
+        shutil.copyfile(out, ROOT / "BP" / "pack_icon.png")
+        report.append(f"ICON {ic.name} -> RP/pack_icon.png, BP/pack_icon.png (256x256)")
+        break
+
+
 def main():
     seen = {}
     report = []
@@ -224,6 +276,7 @@ def main():
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(json.dumps(j, indent=1))
         report.append(f"COPY {f.name} -> {dest.relative_to(ROOT)}")
+    export_assets(report)
     print("\n".join(report))
 
 

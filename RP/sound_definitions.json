@@ -1,0 +1,35 @@
+{
+ "format_version": "1.14.0",
+ "sound_definitions": {
+  "aot.heavy_warhammer_attack": {
+   "category": "neutral",
+   "max_distance": 64,
+   "sounds": [
+    {
+     "name": "sounds/aot/heavy_warhammer_attack",
+     "volume": 1.0
+    }
+   ]
+  },
+  "aot.lara_tybur_death": {
+   "category": "neutral",
+   "max_distance": 64,
+   "sounds": [
+    {
+     "name": "sounds/aot/lara_tybur_death",
+     "volume": 1.0
+    }
+   ]
+  },
+  "aot.titan_shift": {
+   "category": "neutral",
+   "max_distance": 64,
+   "sounds": [
+    {
+     "name": "sounds/aot/titan_shift",
+     "volume": 1.0
+    }
+   ]
+  }
+ }
+}
