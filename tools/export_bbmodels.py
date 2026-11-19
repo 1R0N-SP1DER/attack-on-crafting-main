@@ -277,6 +277,37 @@ def export_assets(report):
         break
 
 
+TITAN_SCALE = 11.0   # player scale in Warhammer form: eye height 1.62 * 11 ~= 17.9 blocks = Warhammer eye line at 2x model size
+TITAN_RENDER = 2.0 / TITAN_SCALE  # model render scale so the final titan is 2x the model (entity scale multiplies it)
+
+
+def patch_player(report):
+    """Take the vanilla player.entity.json pushed to models/ and add the Warhammer titan form."""
+    src = SRC / "player.entity.json"
+    if not src.exists():
+        report.append("NO models/player.entity.json: titan form skipped")
+        return
+    j = json.loads(src.read_text())
+    d = j["minecraft:client_entity"]["description"]
+    d["geometry"]["titan"] = "geometry.aot.war_hammer_titan"
+    d["textures"]["titan"] = "textures/entity/war_hammer_titan"
+    for k in ("idle", "walk", "attack1", "spawn", "eject"):
+        d["animations"][f"aot_wh_{k}"] = f"animation.aot.war_hammer_titan.{k}"
+    d["animations"]["aot_titan_ctrl"] = "controller.animation.aot.player_titan"
+    d["scripts"]["scale"] = f"q.property('aot:form') == 1 ? {TITAN_RENDER:.4f} : 0.9375"
+    d["scripts"].setdefault("animate", []).append({"aot_titan_ctrl": "q.property('aot:form') == 1"})
+    rcs = []
+    for rc in d["render_controllers"]:
+        if isinstance(rc, dict):
+            rcs.append({k: f"({v}) && q.property('aot:form') == 0" for k, v in rc.items()})
+        else:
+            rcs.append({rc: "q.property('aot:form') == 0"})
+    rcs.append({"controller.render.aot.player_titan": "!variable.is_first_person && q.property('aot:form') == 1"})
+    d["render_controllers"] = rcs
+    write(RP / "entity" / "player.entity.json", j)
+    report.append("PLAYER player.entity.json patched with Warhammer titan form")
+
+
 def main():
     seen = {}
     report = []
@@ -321,6 +352,7 @@ def main():
         dest.write_text(json.dumps(j, indent=1))
         report.append(f"COPY {f.name} -> {dest.relative_to(ROOT)}")
     export_assets(report)
+    patch_player(report)
     print("\n".join(report))
 
 
