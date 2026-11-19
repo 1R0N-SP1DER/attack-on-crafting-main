@@ -2,57 +2,80 @@
 import { world, system, EntityDamageCause } from "@minecraft/server";
 
 const T = 20; // ticks per second
+const DIMS = ["overworld", "nether", "the_end"];
+const WARHAMMER = "aot:war_hammer_titan";
+const ATTACK = "aot:attack_titan";
+const LARA = "aot:lara_tybur";
+const EREN = "aot:eren_yeager";
 
-// aot:state property drives client animations: 0 normal, 1 attack1, 2 attack2, 3 spawn
+// aot:state property drives client animations. Titans: 0 normal, 1 attack1, 2 attack2, 3 spawn.
+// Lara: 0 normal, 1 shifting, 2 death. Eren: 0 normal, 1 punch.
+
 const TITANS = {
-  "aot:war_hammer_titan": {
-    spawnSeconds: 7.5,
-    spawnFx: ["stk:t_trans4", "stk:t_trans"],
-    spawnSound: "aot.titan_shift",
-    cooldownSeconds: 4,
+  [WARHAMMER]: {
+    spawnSeconds: 7.5, spawnFx: ["stk:t_trans4", "stk:t_trans"], spawnSound: "aot.titan_shift", lightning: false,
+    cooldownSeconds: 4, sightRange: 10, strikeRange: 12, flyingDelta: 4, height: 20, radius: 3,
     attacks: {
       // hammer slam: 500 damage in a 5x5 area where the hammer hits the ground
       slam: { state: 1, seconds: 3.4375, impactAt: 1.875, damage: 500, forward: 9, halfX: 2.5, halfZ: 2.5, below: 2, above: 4, sound: "aot.heavy_warhammer_attack", fx: "stk:t_trans4", shake: true },
       // swing: used when the target is above/flying around the titan. Damage/timing are placeholders to tune.
       swing: { state: 2, seconds: 3.21429, impactAt: 1.4, damage: 250, forward: 6, halfX: 7, halfZ: 7, below: 4, above: 16, sound: null, fx: null, shake: false },
     },
-    sightRange: 10,
-    slamRange: 12,
-    flyingDelta: 4, // target this many blocks above the titan -> swing
+  },
+  [ATTACK]: {
+    spawnSeconds: 9.2, spawnFx: ["stk:t_trans4", "stk:t_trans"], spawnSound: "aot.titan_shift", lightning: true,
+    cooldownSeconds: 2, sightRange: 12, strikeRange: 6, flyingDelta: 99, height: 11.5, radius: 1.75,
+    weakPoints: true,
+    attacks: {
+      // placeholder punch values to tune (no spec yet)
+      slam: { state: 1, seconds: 1.0, impactAt: 0.5, damage: 30, forward: 4, halfX: 2.5, halfZ: 2.5, below: 2, above: 6, sound: null, fx: "stk:t_trans4", shake: false },
+    },
   },
 };
 
-const busyUntil = new Map(); // entity id -> tick when it may act again
+// Weak points (Attack Titan). Hit position is estimated by casting the attacker's view ray at the titan's body.
+const WEAK = {
+  napeKillDamage: 20,        // a single hit of at least this much on the nape kills the titan
+  napeBand: [0.78, 0.97],    // nape height as a fraction of titan height (back of the neck)
+  eyeBand: [0.80, 0.97],     // eyes: front of the head
+  heelMax: 0.14,             // heels: lowest part of the legs, back/side
+  stunSeconds: 5,            // eyes hit: stun duration
+  slowSeconds: 10,           // one heel cut: slowed
+  kneelSeconds: 20,          // both heels cut: kneels (frozen)
+  healPerSecond: 50,         // titans heal quickly so nothing but a nape hit kills
+};
 
-function setState(entity, v) {
-  try { entity.setProperty("aot:state", v); } catch (e) { console.warn(`setProperty failed: ${e}`); }
-}
+const busyUntil = new Map();   // titan id -> tick it may act again
+const legInjury = new Map();   // titan id -> { left: tick, right: tick }
+const lastSeen = new Map();    // Lara/Eren id -> { dim, location, yaw }
 
-function freeze(entity, ticks) {
-  try { entity.addEffect("slowness", ticks, { amplifier: 250, showParticles: false }); } catch (e) { /* ignore */ }
-}
+const dimOf = (name) => world.getDimension(name);
+const secs = (s) => Math.ceil(s * T);
+function setState(e, v) { try { e.setProperty("aot:state", v); } catch (err) { console.warn(`setProperty failed: ${err}`); } }
+function freeze(e, ticks) { try { e.addEffect("slowness", ticks, { amplifier: 250, showParticles: false }); } catch { /* ignore */ } }
+function fam(e, f) { try { return e.getComponent("minecraft:type_family")?.hasTypeFamily(f) ?? false; } catch { return false; } }
+function isHostileTarget(e) { return e.typeId === "minecraft:player" || (fam(e, "monster") && !fam(e, "aot_titan")); }
+function safe(fn) { try { return fn(); } catch { return undefined; } }
 
-function isHostileTarget(e) {
-  if (e.typeId === "minecraft:player") return true;
-  try { return e.getComponent("minecraft:type_family")?.hasTypeFamily("monster") && !e.getComponent("minecraft:type_family")?.hasTypeFamily("aot_titan"); } catch { return false; }
+function fx(dim, loc, particles, sound, lightning) {
+  for (const p of particles ?? []) safe(() => dim.spawnParticle(p, loc));
+  if (sound) safe(() => dim.playSound(sound, loc));
+  if (lightning) safe(() => dim.runCommand(`summon lightning_bolt ${loc.x} ${loc.y} ${loc.z}`));
 }
 
 function nearestTarget(titan, range) {
-  const found = titan.dimension.getEntities({ location: titan.location, maxDistance: range });
   let best = null, bestD = Infinity;
-  for (const e of found) {
+  for (const e of titan.dimension.getEntities({ location: titan.location, maxDistance: range })) {
     if (e.id === titan.id || !isHostileTarget(e)) continue;
-    const dx = e.location.x - titan.location.x, dz = e.location.z - titan.location.z;
-    const d = Math.hypot(dx, dz);
+    const d = Math.hypot(e.location.x - titan.location.x, e.location.z - titan.location.z);
     if (d < bestD) { best = e; bestD = d; }
   }
-  return best ? { entity: best, dist: bestD } : null;
+  return best;
 }
 
-function faceToward(titan, target) {
-  const dx = target.location.x - titan.location.x, dz = target.location.z - titan.location.z;
-  const yaw = (Math.atan2(-dx, dz) * 180) / Math.PI;
-  try { titan.setRotation({ x: 0, y: yaw }); } catch (e) { /* ignore */ }
+function faceToward(ent, target) {
+  const yaw = (Math.atan2(-(target.location.x - ent.location.x), target.location.z - ent.location.z) * 180) / Math.PI;
+  safe(() => ent.setRotation({ x: 0, y: yaw }));
   return yaw;
 }
 
@@ -61,56 +84,199 @@ function doImpact(titan, yaw, a) {
   const rad = (yaw * Math.PI) / 180;
   const p = { x: titan.location.x - Math.sin(rad) * a.forward, y: titan.location.y, z: titan.location.z + Math.cos(rad) * a.forward };
   const dim = titan.dimension;
-  const hits = dim.getEntities({ location: p, maxDistance: Math.hypot(a.halfX, a.halfZ) + a.above + 2 });
-  for (const e of hits) {
+  for (const e of dim.getEntities({ location: p, maxDistance: Math.hypot(a.halfX, a.halfZ) + a.above + 2 })) {
     if (e.id === titan.id || !isHostileTarget(e)) continue;
-    const dx = Math.abs(e.location.x - p.x), dz = Math.abs(e.location.z - p.z), dy = e.location.y - p.y;
-    if (dx <= a.halfX && dz <= a.halfZ && dy >= -a.below && dy <= a.above) {
-      try { e.applyDamage(a.damage, { cause: EntityDamageCause.entityAttack, damagingEntity: titan }); } catch (err) { console.warn(`applyDamage failed: ${err}`); }
+    const dy = e.location.y - p.y;
+    if (Math.abs(e.location.x - p.x) <= a.halfX && Math.abs(e.location.z - p.z) <= a.halfZ && dy >= -a.below && dy <= a.above) {
+      safe(() => e.applyDamage(a.damage, { cause: EntityDamageCause.entityAttack, damagingEntity: titan }));
     }
   }
-  if (a.fx) { try { dim.spawnParticle(a.fx, p); } catch (e) { /* ignore */ } }
-  if (a.shake) { try { dim.runCommand(`camerashake add @a[x=${p.x},y=${p.y},z=${p.z},r=40] 0.6 0.6 positional`); } catch (e) { /* ignore */ } }
+  if (a.fx) safe(() => dim.spawnParticle(a.fx, p));
+  if (a.shake) safe(() => dim.runCommand(`camerashake add @a[x=${p.x},y=${p.y},z=${p.z},r=40] 0.6 0.6 positional`));
 }
 
 function startAttack(titan, cfg, a, target) {
   const yaw = faceToward(titan, target);
-  const now = system.currentTick;
-  busyUntil.set(titan.id, now + Math.ceil(a.seconds * T) + Math.ceil(cfg.cooldownSeconds * T));
+  busyUntil.set(titan.id, system.currentTick + secs(a.seconds) + secs(cfg.cooldownSeconds));
   setState(titan, a.state);
-  freeze(titan, Math.ceil(a.seconds * T));
-  if (a.sound) { try { titan.dimension.playSound(a.sound, titan.location); } catch (e) { /* ignore */ } }
-  system.runTimeout(() => doImpact(titan, yaw, a), Math.ceil(a.impactAt * T));
-  system.runTimeout(() => { if (titan.isValid) setState(titan, 0); }, Math.ceil(a.seconds * T));
+  freeze(titan, secs(a.seconds));
+  if (a.sound) safe(() => titan.dimension.playSound(a.sound, titan.location));
+  system.runTimeout(() => doImpact(titan, yaw, a), secs(a.impactAt));
+  system.runTimeout(() => { if (titan.isValid) setState(titan, 0); }, secs(a.seconds));
 }
 
+// ---- titan AI tick
 system.runInterval(() => {
-  for (const dim of ["overworld", "nether", "the_end"]) {
-    let titans;
-    try { titans = world.getDimension(dim).getEntities({ families: ["aot_titan"] }); } catch { continue; }
+  for (const dn of DIMS) {
+    const titans = safe(() => dimOf(dn).getEntities({ families: ["aot_titan"] })) ?? [];
     for (const titan of titans) {
       const cfg = TITANS[titan.typeId];
-      if (!cfg) continue;
-      if ((busyUntil.get(titan.id) ?? 0) > system.currentTick) continue;
-      const t = nearestTarget(titan, cfg.slamRange);
-      if (!t) continue;
-      const dy = t.entity.location.y - titan.location.y;
-      const a = dy >= cfg.flyingDelta ? cfg.attacks.swing : cfg.attacks.slam;
-      startAttack(titan, cfg, a, t.entity);
+      if (!cfg || (busyUntil.get(titan.id) ?? 0) > system.currentTick) continue;
+      const target = nearestTarget(titan, cfg.strikeRange);
+      if (!target) continue;
+      const swing = cfg.attacks.swing && target.location.y - titan.location.y >= cfg.flyingDelta;
+      startAttack(titan, cfg, swing ? cfg.attacks.swing : cfg.attacks.slam, target);
     }
   }
 }, 5);
 
+// ---- titan spawn effects (also used when Lara/Eren transform)
 world.afterEvents.entitySpawn.subscribe((ev) => {
   const cfg = TITANS[ev.entity.typeId];
   if (!cfg || ev.cause !== "Spawned") return;
-  const titan = ev.entity;
-  const ticks = Math.ceil(cfg.spawnSeconds * T);
-  busyUntil.set(titan.id, system.currentTick + ticks + Math.ceil(cfg.cooldownSeconds * T));
+  const titan = ev.entity, ticks = secs(cfg.spawnSeconds);
+  busyUntil.set(titan.id, system.currentTick + ticks + secs(cfg.cooldownSeconds));
   setState(titan, 3);
   freeze(titan, ticks);
-  try { titan.addEffect("resistance", ticks, { amplifier: 4, showParticles: false }); } catch (e) { /* ignore */ }
-  for (const fx of cfg.spawnFx) { try { titan.dimension.spawnParticle(fx, titan.location); } catch (e) { /* ignore */ } }
-  try { titan.dimension.playSound(cfg.spawnSound, titan.location); } catch (e) { /* ignore */ }
+  safe(() => titan.addEffect("resistance", ticks, { amplifier: 4, showParticles: false }));
+  fx(titan.dimension, titan.location, cfg.spawnFx, cfg.spawnSound, cfg.lightning);
   system.runTimeout(() => { if (titan.isValid) setState(titan, 0); }, ticks);
 });
+
+// ---- weak points: nape / eyes / heels (Attack Titan)
+function hitInfo(attacker, titan, cfg) {
+  // Cast the attacker's view ray against a vertical cylinder around the titan.
+  const o = attacker.getHeadLocation(), d = attacker.getViewDirection(), c = titan.location, r = cfg.radius + 0.6;
+  const ox = o.x - c.x, oz = o.z - c.z;
+  const A = d.x * d.x + d.z * d.z, B = 2 * (ox * d.x + oz * d.z), C = ox * ox + oz * oz - r * r;
+  let t;
+  if (A < 1e-6) t = Math.hypot(ox, oz);
+  else {
+    const disc = B * B - 4 * A * C;
+    if (disc < 0) t = Math.hypot(ox, oz) - r; // ray missed: use closest approach
+    else t = Math.max(0, (-B - Math.sqrt(disc)) / (2 * A));
+  }
+  const hit = { x: o.x + d.x * t, y: o.y + d.y * t, z: o.z + d.z * t };
+  const f = (hit.y - c.y) / cfg.height;
+  const yaw = (titan.getRotation().y * Math.PI) / 180;
+  const fwd = { x: -Math.sin(yaw), z: Math.cos(yaw) };
+  const rel = { x: hit.x - c.x, z: hit.z - c.z };
+  const len = Math.hypot(rel.x, rel.z) || 1;
+  const front = (rel.x * fwd.x + rel.z * fwd.z) / len;       // +1 front, -1 back
+  const side = (rel.x * -fwd.z + rel.z * fwd.x) / len;       // sign picks left/right leg
+  return { f, front, side };
+}
+
+function healTitans() {
+  for (const dn of DIMS) {
+    for (const t of safe(() => dimOf(dn).getEntities({ type: ATTACK })) ?? []) {
+      const h = t.getComponent("minecraft:health");
+      if (h) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + WEAK.healPerSecond)));
+    }
+  }
+}
+system.runInterval(healTitans, T);
+
+world.afterEvents.entityHurt.subscribe((ev) => {
+  const titan = ev.hurtEntity;
+  const cfg = TITANS[titan.typeId];
+  if (!cfg?.weakPoints) return;
+  const h = titan.getComponent("minecraft:health");
+  const attacker = ev.damageSource.damagingEntity;
+  let zone = null;
+  if (attacker && attacker.typeId === "minecraft:player") {
+    const { f, front, side } = hitInfo(attacker, titan, cfg);
+    if (f >= WEAK.napeBand[0] && f <= WEAK.napeBand[1] && front < -0.2) zone = "nape";
+    else if (f >= WEAK.eyeBand[0] && f <= WEAK.eyeBand[1] && front > 0.3) zone = "eyes";
+    else if (f <= WEAK.heelMax && front < 0.4) zone = side < 0 ? "heelL" : "heelR";
+  }
+  if (zone === "nape" && ev.damage >= WEAK.napeKillDamage) {
+    safe(() => titan.dimension.spawnParticle("stk:t_trans4", titan.location));
+    safe(() => titan.kill());
+    return;
+  }
+  // everything else is healed back; weak-point side effects:
+  if (h) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + ev.damage)));
+  const now = system.currentTick;
+  if (zone === "eyes") {
+    busyUntil.set(titan.id, now + secs(WEAK.stunSeconds));
+    freeze(titan, secs(WEAK.stunSeconds));
+    safe(() => titan.addEffect("weakness", secs(WEAK.stunSeconds), { amplifier: 4, showParticles: false }));
+  } else if (zone === "heelL" || zone === "heelR") {
+    const inj = legInjury.get(titan.id) ?? {};
+    inj[zone === "heelL" ? "left" : "right"] = now + secs(WEAK.slowSeconds);
+    legInjury.set(titan.id, inj);
+    if ((inj.left ?? 0) > now && (inj.right ?? 0) > now) {
+      busyUntil.set(titan.id, now + secs(WEAK.kneelSeconds));
+      freeze(titan, secs(WEAK.kneelSeconds)); // kneeling: no kneel animation yet, so it just stops
+    } else {
+      safe(() => titan.addEffect("slowness", secs(WEAK.slowSeconds), { amplifier: 3, showParticles: false }));
+    }
+  }
+});
+
+// ---- Eren: lethal hit turns him into the Attack Titan
+function rememberPositions() {
+  for (const dn of DIMS) {
+    for (const t of [LARA, EREN]) {
+      for (const e of safe(() => dimOf(dn).getEntities({ type: t })) ?? []) {
+        lastSeen.set(e.id, { dim: dn, location: e.location, yaw: safe(() => e.getRotation().y) ?? 0 });
+      }
+    }
+  }
+}
+system.runInterval(rememberPositions, 2);
+
+function placeOf(ev) {
+  const id = safe(() => ev.deadEntity.id);
+  return lastSeen.get(id) ?? (safe(() => ({ dim: ev.deadEntity.dimension.id.replace("minecraft:", ""), location: ev.deadEntity.location, yaw: 0 })));
+}
+
+world.afterEvents.entityDie.subscribe((ev) => {
+  const p = placeOf(ev);
+  if (!p) return;
+  safe(() => {
+    const t = dimOf(p.dim).spawnEntity(ATTACK, p.location);
+    safe(() => t.setRotation({ x: 0, y: p.yaw }));
+  });
+}, { entityTypes: [EREN] });
+
+// Eren punch animation when he lands a hit
+world.afterEvents.entityHitEntity.subscribe((ev) => {
+  const a = ev.damagingEntity;
+  if (a.typeId !== EREN) return;
+  setState(a, 1);
+  system.runTimeout(() => { if (a.isValid) setState(a, 0); }, T);
+});
+
+// ---- Lara: any hit makes her shift into the Warhammer Titan; a lethal hit plays the death animation first
+const LARA_SHIFT = { shiftSeconds: 6.875, transformAt: 2.1, deathSeconds: 13, deathTransformAt: 9.8 };
+
+function transformLara(lara, atSeconds, loc, dimName, yaw) {
+  system.runTimeout(() => {
+    if (lara.isValid) safe(() => lara.remove());
+    safe(() => {
+      const t = dimOf(dimName).spawnEntity(WARHAMMER, loc);
+      safe(() => t.setRotation({ x: 0, y: yaw }));
+    });
+  }, secs(atSeconds));
+}
+
+world.afterEvents.entityHurt.subscribe((ev) => {
+  const lara = ev.hurtEntity;
+  if (lara.typeId !== LARA || (busyUntil.get(lara.id) ?? 0) > system.currentTick) return;
+  const hp = safe(() => lara.getComponent("minecraft:health")?.currentValue);
+  if (hp !== undefined && hp <= 0) return; // lethal hit: the entityDie handler below takes over
+  busyUntil.set(lara.id, system.currentTick + secs(LARA_SHIFT.shiftSeconds));
+  setState(lara, 1);
+  freeze(lara, secs(LARA_SHIFT.shiftSeconds));
+  safe(() => lara.addEffect("resistance", secs(LARA_SHIFT.shiftSeconds), { amplifier: 4, showParticles: false }));
+  safe(() => lara.dimension.playSound("aot.titan_shift", lara.location));
+  transformLara(lara, LARA_SHIFT.transformAt, lara.location, lara.dimension.id.replace("minecraft:", ""), lara.getRotation().y);
+}, { entityTypes: [LARA] });
+
+world.afterEvents.entityDie.subscribe((ev) => {
+  // Killed before she could shift: bring her back for the death animation, then she shifts anyway.
+  const p = placeOf(ev);
+  if (!p) return;
+  safe(() => {
+    const lara = dimOf(p.dim).spawnEntity(LARA, p.location);
+    busyUntil.set(lara.id, system.currentTick + secs(LARA_SHIFT.deathSeconds));
+    safe(() => lara.setRotation({ x: 0, y: p.yaw }));
+    setState(lara, 2);
+    freeze(lara, secs(LARA_SHIFT.deathSeconds));
+    safe(() => lara.addEffect("resistance", secs(LARA_SHIFT.deathSeconds), { amplifier: 4, showParticles: false }));
+    safe(() => dimOf(p.dim).playSound("aot.lara_tybur_death", p.location));
+    transformLara(lara, LARA_SHIFT.deathTransformAt, p.location, p.dim, p.yaw);
+  });
+}, { entityTypes: [LARA] });

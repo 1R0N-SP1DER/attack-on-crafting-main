@@ -1,0 +1,37 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "aot:lara_tybur",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/lara_tybur"
+      },
+      "geometry": {
+        "default": "geometry.aot.lara_tybur"
+      },
+      "animations": {
+        "idle": "animation.aot.lara_tybur.idle",
+        "walk": "animation.aot.lara_tybur.walk",
+        "shifting": "animation.aot.lara_tybur.shifting",
+        "death": "animation.aot.lara_tybur.death",
+        "main": "controller.animation.aot.lara_tybur"
+      },
+      "scripts": {
+        "scale": "1.0",
+        "animate": [
+          "main"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ],
+      "spawn_egg": {
+        "base_color": "#6b4a2f",
+        "overlay_color": "#d8c3a5"
+      }
+    }
+  }
+}

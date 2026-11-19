@@ -1,0 +1,67 @@
+{
+  "format_version": "1.10.0",
+  "animation_controllers": {
+    "controller.animation.aot.eren_yeager": {
+      "initial_state": "default",
+      "states": {
+        "default": {
+          "animations": [],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "punch": "q.property('aot:state') == 1"
+            },
+            {
+              "running": "q.ground_speed > 0.2"
+            },
+            {
+              "walk": "q.ground_speed > 0.05"
+            }
+          ]
+        },
+        "walk": {
+          "animations": [
+            "walk"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "punch": "q.property('aot:state') == 1"
+            },
+            {
+              "running": "q.ground_speed > 0.2"
+            },
+            {
+              "default": "q.ground_speed < 0.03"
+            }
+          ]
+        },
+        "running": {
+          "animations": [
+            "running"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "punch": "q.property('aot:state') == 1"
+            },
+            {
+              "walk": "q.ground_speed < 0.15"
+            }
+          ]
+        },
+        "punch": {
+          "animations": [
+            "punch"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "default": "q.property('aot:state') == 0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

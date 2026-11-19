@@ -1,0 +1,20 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "conditions": [
+        {
+          "condition": "random_chance",
+          "chance": 0.3
+        }
+      ],
+      "entries": [
+        {
+          "type": "item",
+          "name": "aot:warhammer_serum",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "aot:attack_titan",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/attack_titan"
+      },
+      "geometry": {
+        "default": "geometry.aot.attack_titan"
+      },
+      "animations": {
+        "walk": "animation.aot.attack_titan.new4",
+        "attack1": "animation.aot.attack_titan.new2",
+        "spawn": "animation.aot.attack_titan.new",
+        "main": "controller.animation.aot.attack_titan"
+      },
+      "scripts": {
+        "scale": "1.0",
+        "animate": [
+          "main"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ],
+      "spawn_egg": {
+        "base_color": "#b0715a",
+        "overlay_color": "#3b2a22"
+      }
+    }
+  }
+}
