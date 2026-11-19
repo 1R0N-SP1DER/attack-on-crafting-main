@@ -88,6 +88,14 @@ for p in ROOT.glob("RP/entity/*.entity.json"):
     if not j:
         continue
     d = j["minecraft:client_entity"]["description"]
+    if d["identifier"] == "minecraft:player":
+        for k, g in d.get("geometry", {}).items():
+            if g.startswith("geometry.aot.") and g not in geo_ids:
+                errors.append(f"{p.name}: geometry {g} not found")
+        for k, a in d.get("animations", {}).items():
+            if (k.startswith("aot_") or a.startswith(("animation.aot.", "controller.animation.aot."))) and a not in anim_ids and a not in ctrl_ids:
+                errors.append(f"{p.name}: animation '{k}' -> {a} not found")
+        continue
     if d["identifier"] not in bp_ids:
         errors.append(f"{p.name}: no behavior entity with id {d['identifier']}")
     for g in d.get("geometry", {}).values():

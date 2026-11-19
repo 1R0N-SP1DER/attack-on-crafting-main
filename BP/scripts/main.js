@@ -326,3 +326,130 @@ world.afterEvents.entityDie.subscribe((ev) => {
     transformLara(lara, LARA_SHIFT.deathTransformAt, p.location, p.dim, p.yaw);
   });
 }, { entityTypes: [LARA] });
+
+// =====================================================================================
+// Player titan form (Warhammer). Properties on the player: aot:form (0 human, 1 warhammer)
+// and aot:phase (0 normal, 1 shifting in, 2 attacking, 3 ejecting).
+// Shift in: right-click the Warhammer serum. Eject: hold sneak for 3 seconds.
+// =====================================================================================
+const FORM = {
+  warhammer: {
+    id: 1, serum: "aot:warhammer_serum", spawnSeconds: 7.5, ejectSeconds: 6,
+    holdSneakTicks: 60,                       // hold sneak this long to eject
+    healPerSecond: 4,                         // shifters heal fast, with steam
+    // placeholder survivability: health boost + resistance (tune freely)
+    effects: [["health_boost", 49], ["resistance", 2], ["jump_boost", 2], ["speed", 1]],
+    slam: { state: 2, seconds: 3.4375, impactAt: 1.875, damage: 500, halfX: 2.5, halfZ: 2.5, below: 2, above: 4, sound: "aot.heavy_warhammer_attack", fx: "stk:t_trans4", shake: true },
+    cooldownSeconds: 4,
+  },
+};
+const FOREVER = 20000000;
+const formOf = (p) => safe(() => p.getProperty("aot:form")) ?? 0;
+const setPhase = (p, v) => safe(() => p.setProperty("aot:phase", v));
+const sneakTicks = new Map();
+const formCooldown = new Map();
+
+function addFormEffects(p, f, ticks) {
+  for (const [name, amp] of f.effects) safe(() => p.addEffect(name, ticks, { amplifier: amp, showParticles: false }));
+}
+
+function shiftIn(p, f) {
+  if (formOf(p) !== 0) return;
+  safe(() => p.triggerEvent("aot:warhammer_on"));
+  setPhase(p, 1);
+  const ticks = secs(f.spawnSeconds);
+  fx(p.dimension, p.location, ["stk:t_trans4", "stk:t_trans"], "aot.titan_shift", false);
+  freeze(p, ticks);
+  addFormEffects(p, f, FOREVER);
+  formCooldown.set(p.id, system.currentTick + ticks);
+  system.runTimeout(() => { if (p.isValid && formOf(p) === f.id) setPhase(p, 0); }, ticks);
+}
+
+function eject(p, f) {
+  if (formOf(p) !== f.id || safe(() => p.getProperty("aot:phase")) === 3) return;
+  setPhase(p, 3);
+  freeze(p, secs(f.ejectSeconds));
+  system.runTimeout(() => {
+    if (!p.isValid) return;
+    safe(() => p.triggerEvent("aot:warhammer_off"));
+    for (const [name] of f.effects) safe(() => p.removeEffect(name));
+    steamAt(p.dimension, { x: p.location.x, y: p.location.y + 1, z: p.location.z }, 4);
+  }, secs(f.ejectSeconds));
+}
+
+// right-click the serum
+world.afterEvents.itemUse.subscribe((ev) => {
+  const p = ev.source;
+  const f = Object.values(FORM).find((x) => x.serum === ev.itemStack?.typeId);
+  if (!f || formOf(p) !== 0) return;
+  safe(() => {
+    const inv = p.getComponent("inventory").container, slot = p.selectedSlotIndex, it = inv.getItem(slot);
+    if (it.amount > 1) { it.amount -= 1; inv.setItem(slot, it); } else inv.setItem(slot, undefined);
+  });
+  shiftIn(p, f);
+});
+
+// per-player tick: sneak-to-eject, healing with steam
+system.runInterval(() => {
+  for (const p of world.getAllPlayers()) {
+    const f = Object.values(FORM).find((x) => x.id === formOf(p));
+    if (!f) { sneakTicks.delete(p.id); continue; }
+    const phase = safe(() => p.getProperty("aot:phase")) ?? 0;
+    if (phase === 0) {
+      const n = p.isSneaking ? (sneakTicks.get(p.id) ?? 0) + 4 : 0;
+      sneakTicks.set(p.id, n);
+      if (n >= f.holdSneakTicks) { sneakTicks.set(p.id, 0); eject(p, f); }
+    }
+  }
+}, 4);
+
+system.runInterval(() => {
+  for (const p of world.getAllPlayers()) {
+    const f = Object.values(FORM).find((x) => x.id === formOf(p));
+    if (!f) continue;
+    const h = p.getComponent("minecraft:health");
+    if (h && h.currentValue < h.effectiveMax) {
+      safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + f.healPerSecond)));
+      steamAt(p.dimension, { x: p.location.x + (Math.random() - 0.5) * 3, y: p.location.y + Math.random() * 18, z: p.location.z + (Math.random() - 0.5) * 3 }, 2);
+    }
+  }
+}, T);
+
+// shifters steam where they are hurt
+world.afterEvents.entityHurt.subscribe((ev) => {
+  const p = ev.hurtEntity;
+  if (formOf(p) === 0) return;
+  steamAt(p.dimension, { x: p.location.x, y: p.location.y + 10, z: p.location.z }, 2);
+}, { entityTypes: ["minecraft:player"] });
+
+// attacking in titan form: hitting something slams the area around the target (500 in 5x5)
+world.afterEvents.entityHitEntity.subscribe((ev) => {
+  const p = ev.damagingEntity;
+  if (p.typeId !== "minecraft:player") return;
+  const f = Object.values(FORM).find((x) => x.id === formOf(p));
+  if (!f || (formCooldown.get(p.id) ?? 0) > system.currentTick) return;
+  const a = f.slam, at = ev.hitEntity.location;
+  formCooldown.set(p.id, system.currentTick + secs(f.cooldownSeconds));
+  setPhase(p, a.state);
+  safe(() => p.dimension.playSound(a.sound, p.location));
+  system.runTimeout(() => {
+    if (!p.isValid) return;
+    for (const e of p.dimension.getEntities({ location: at, maxDistance: Math.hypot(a.halfX, a.halfZ) + a.above + 2 })) {
+      if (e.id === p.id || e.typeId === "minecraft:player" || e.typeId === "minecraft:item") continue;
+      const dy = e.location.y - at.y;
+      if (Math.abs(e.location.x - at.x) <= a.halfX && Math.abs(e.location.z - at.z) <= a.halfZ && dy >= -a.below && dy <= a.above) {
+        safe(() => e.applyDamage(a.damage, { cause: EntityDamageCause.entityAttack, damagingEntity: p }));
+      }
+    }
+    safe(() => p.dimension.spawnParticle(a.fx, at));
+    safe(() => p.dimension.runCommand(`camerashake add @a[x=${at.x},y=${at.y},z=${at.z},r=40] 0.6 0.6 positional`));
+  }, secs(a.impactAt));
+  system.runTimeout(() => { if (p.isValid && formOf(p) === f.id) setPhase(p, 0); }, secs(a.seconds));
+});
+
+// dying or respawning resets the form
+world.afterEvents.playerSpawn.subscribe((ev) => {
+  if (ev.initialSpawn || formOf(ev.player) === 0) return;
+  safe(() => ev.player.triggerEvent("aot:warhammer_off"));
+  for (const f of Object.values(FORM)) for (const [name] of f.effects) safe(() => ev.player.removeEffect(name));
+});

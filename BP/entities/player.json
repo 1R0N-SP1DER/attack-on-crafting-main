@@ -1,0 +1,58 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "minecraft:player",
+      "properties": {
+        "aot:form": {
+          "type": "int",
+          "range": [
+            0,
+            2
+          ],
+          "default": 0,
+          "client_sync": true
+        },
+        "aot:phase": {
+          "type": "int",
+          "range": [
+            0,
+            3
+          ],
+          "default": 0,
+          "client_sync": true
+        }
+      }
+    },
+    "component_groups": {
+      "aot:warhammer_form": {
+        "minecraft:scale": {
+          "value": 11.0
+        }
+      }
+    },
+    "events": {
+      "aot:warhammer_on": {
+        "add": {
+          "component_groups": [
+            "aot:warhammer_form"
+          ]
+        },
+        "set_property": {
+          "aot:form": 1
+        }
+      },
+      "aot:warhammer_off": {
+        "remove": {
+          "component_groups": [
+            "aot:warhammer_form"
+          ]
+        },
+        "set_property": {
+          "aot:form": 0,
+          "aot:phase": 0
+        }
+      }
+    }
+  }
+}

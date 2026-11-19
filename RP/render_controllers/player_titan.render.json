@@ -1,0 +1,16 @@
+{
+  "format_version": "1.10.0",
+  "render_controllers": {
+    "controller.render.aot.player_titan": {
+      "geometry": "Geometry.titan",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Texture.titan"
+      ]
+    }
+  }
+}

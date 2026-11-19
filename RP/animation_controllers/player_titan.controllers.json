@@ -1,0 +1,83 @@
+{
+  "format_version": "1.10.0",
+  "animation_controllers": {
+    "controller.animation.aot.player_titan": {
+      "initial_state": "idle",
+      "states": {
+        "idle": {
+          "animations": [
+            "aot_wh_idle"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "spawn": "q.property('aot:phase') == 1"
+            },
+            {
+              "attack1": "q.property('aot:phase') == 2"
+            },
+            {
+              "eject": "q.property('aot:phase') == 3"
+            },
+            {
+              "walk": "q.ground_speed > 0.1"
+            }
+          ]
+        },
+        "walk": {
+          "animations": [
+            "aot_wh_walk"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "spawn": "q.property('aot:phase') == 1"
+            },
+            {
+              "attack1": "q.property('aot:phase') == 2"
+            },
+            {
+              "eject": "q.property('aot:phase') == 3"
+            },
+            {
+              "idle": "q.ground_speed < 0.05"
+            }
+          ]
+        },
+        "spawn": {
+          "animations": [
+            "aot_wh_spawn"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "idle": "q.property('aot:phase') != 1"
+            }
+          ]
+        },
+        "attack1": {
+          "animations": [
+            "aot_wh_attack1"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "idle": "q.property('aot:phase') != 2"
+            }
+          ]
+        },
+        "eject": {
+          "animations": [
+            "aot_wh_eject"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "idle": "q.property('aot:phase') != 3"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
