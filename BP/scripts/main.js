@@ -183,37 +183,54 @@ function hitInfo(attacker, titan, cfg) {
   const len = Math.hypot(rel.x, rel.z) || 1;
   const front = (rel.x * fwd.x + rel.z * fwd.z) / len;       // +1 front, -1 back
   const side = (rel.x * -fwd.z + rel.z * fwd.x) / len;       // sign picks left/right leg
-  return { f, front, side };
+  return { f, front, side, hit };
 }
 
 function healTitans() {
   for (const dn of DIMS) {
     for (const t of safe(() => dimOf(dn).getEntities({ type: ATTACK })) ?? []) {
       const h = t.getComponent("minecraft:health");
-      if (h) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + WEAK.healPerSecond)));
+      if (h && h.currentValue < h.effectiveMax) {
+        safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + WEAK.healPerSecond)));
+        const c = t.location, ch = TITANS[ATTACK].height;
+        steamAt(t.dimension, { x: c.x + (Math.random() - 0.5) * 2.5, y: c.y + Math.random() * ch, z: c.z + (Math.random() - 0.5) * 2.5 }, 2); // steam while healing
+      }
     }
   }
 }
 system.runInterval(healTitans, T);
 
+const STEAM = "aot:steam"; // small steam puff, built from the t_trans4 smoke texture
+
+function steamAt(dim, loc, n = 3) {
+  for (let i = 0; i < n; i++) {
+    safe(() => dim.spawnParticle(STEAM, { x: loc.x + (Math.random() - 0.5) * 0.6, y: loc.y + (Math.random() - 0.5) * 0.6, z: loc.z + (Math.random() - 0.5) * 0.6 }));
+  }
+}
+
 world.afterEvents.entityHurt.subscribe((ev) => {
   const titan = ev.hurtEntity;
   const cfg = TITANS[titan.typeId];
-  if (!cfg?.weakPoints) return;
+  if (!cfg) return;
   const h = titan.getComponent("minecraft:health");
   const attacker = ev.damageSource.damagingEntity;
-  let zone = null;
+  let zone = null, where = { x: titan.location.x, y: titan.location.y + cfg.height * 0.5, z: titan.location.z };
   if (attacker && attacker.typeId === "minecraft:player") {
-    const { f, front, side } = hitInfo(attacker, titan, cfg);
-    if (f >= WEAK.napeBand[0] && f <= WEAK.napeBand[1] && front < -0.2) zone = "nape";
-    else if (f >= WEAK.eyeBand[0] && f <= WEAK.eyeBand[1] && front > 0.3) zone = "eyes";
-    else if (f <= WEAK.heelMax && front < 0.4) zone = side < 0 ? "heelL" : "heelR";
+    const { f, front, side, hit } = hitInfo(attacker, titan, cfg);
+    where = hit;
+    if (cfg.weakPoints) {
+      if (f >= WEAK.napeBand[0] && f <= WEAK.napeBand[1] && front < -0.2) zone = "nape";
+      else if (f >= WEAK.eyeBand[0] && f <= WEAK.eyeBand[1] && front > 0.3) zone = "eyes";
+      else if (f <= WEAK.heelMax && front < 0.4) zone = side < 0 ? "heelL" : "heelR";
+    }
   }
   if (zone === "nape" && ev.damage >= WEAK.napeKillDamage) {
-    safe(() => titan.dimension.spawnParticle("stk:t_trans4", titan.location));
-    safe(() => titan.kill());
+    safe(() => titan.kill()); // critical nape hit: the titan dies, no steam
     return;
   }
+  // steam where the titan was hit (the wound is healing)
+  steamAt(titan.dimension, where, zone ? 2 : 1);
+  if (!cfg.weakPoints) return;
   // everything else is healed back; weak-point side effects:
   if (h) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + ev.damage)));
   const now = system.currentTick;
