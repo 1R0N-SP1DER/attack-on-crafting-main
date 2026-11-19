@@ -1,2 +1,10 @@
 entity.aot:war_hammer_titan.name=Warhammer Titan
 item.spawn_egg.entity.aot:war_hammer_titan.name=Warhammer Titan Spawn Egg
+entity.aot:lara_tybur.name=Lara Tybur
+item.spawn_egg.entity.aot:lara_tybur.name=Lara Tybur Spawn Egg
+entity.aot:eren_yeager.name=Eren Yeager
+item.spawn_egg.entity.aot:eren_yeager.name=Eren Yeager Spawn Egg
+entity.aot:attack_titan.name=Attack Titan
+item.spawn_egg.entity.aot:attack_titan.name=Attack Titan Spawn Egg
+item.aot:warhammer_serum.name=Warhammer Serum
+item.aot:titan_shifter_serum.name=Titan Shifter Serum

@@ -105,6 +105,9 @@
       },
       "minecraft:behavior.random_look_around": {
         "priority": 7
+      },
+      "minecraft:loot": {
+        "table": "loot_tables/entities/war_hammer_titan.json"
       }
     }
   }

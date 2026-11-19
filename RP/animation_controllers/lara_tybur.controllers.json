@@ -1,0 +1,66 @@
+{
+  "format_version": "1.10.0",
+  "animation_controllers": {
+    "controller.animation.aot.lara_tybur": {
+      "initial_state": "default",
+      "states": {
+        "default": {
+          "animations": [
+            "idle"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "shifting": "q.property('aot:state') == 1"
+            },
+            {
+              "death": "q.property('aot:state') == 2"
+            },
+            {
+              "walk": "q.ground_speed > 0.1"
+            }
+          ]
+        },
+        "walk": {
+          "animations": [
+            "walk"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "shifting": "q.property('aot:state') == 1"
+            },
+            {
+              "death": "q.property('aot:state') == 2"
+            },
+            {
+              "default": "q.ground_speed < 0.05"
+            }
+          ]
+        },
+        "shifting": {
+          "animations": [
+            "shifting"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "default": "q.property('aot:state') == 0"
+            }
+          ]
+        },
+        "death": {
+          "animations": [
+            "death"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "default": "q.property('aot:state') == 0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

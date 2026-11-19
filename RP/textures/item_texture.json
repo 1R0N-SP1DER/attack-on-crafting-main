@@ -1,0 +1,12 @@
+{
+  "resource_pack_name": "aot",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "aot_warhammer_serum": {
+      "textures": "textures/items/warhammer_serum"
+    },
+    "aot_titan_shifter_serum": {
+      "textures": "textures/items/titan_shifter_serum"
+    }
+  }
+}

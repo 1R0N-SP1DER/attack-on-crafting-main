@@ -181,6 +181,32 @@ def write(path, obj):
     path.write_text(json.dumps(obj, indent=1))
 
 
+IMAGE_RULES = {
+    # file stem in models/ -> (destination under RP/, remove black background?)
+    "ray2": ("textures/particle/ray2.png", False),
+    "titan_shifter_serum": ("textures/entity/titan_shifter_serum.png", True),
+}
+
+
+def black_to_transparent(im, thresh=28):
+    """Flood-fill near-black pixels connected to the border into transparency."""
+    w, h = im.size
+    px = im.load()
+    seen = [[False] * h for _ in range(w)]
+    stack = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
+    while stack:
+        x, y = stack.pop()
+        if x < 0 or y < 0 or x >= w or y >= h or seen[x][y]:
+            continue
+        r, g, b, a = px[x, y]
+        if max(r, g, b) > thresh:
+            continue
+        seen[x][y] = True
+        px[x, y] = (0, 0, 0, 0)
+        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    return im
+
+
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -213,6 +239,24 @@ def export_assets(report):
         write(RP / "sound_definitions.json", {"format_version": "1.14.0", "sound_definitions": defs})
         stamp_file.parent.mkdir(parents=True, exist_ok=True)
         stamp_file.write_text(json.dumps(stamps, indent=1, sort_keys=True))
+    for img in sorted(list(SRC.glob("*.jpg")) + list(SRC.glob("*.png"))):
+        rule = IMAGE_RULES.get(img.stem)
+        if not rule:
+            continue
+        dest, clear_bg = RP / rule[0], rule[1]
+        key = "img_" + img.stem
+        h = sha(img)
+        if stamps.get(key) != h or not dest.exists():
+            from PIL import Image
+            im = Image.open(img).convert("RGBA")
+            if clear_bg:
+                im = black_to_transparent(im)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            im.save(dest)
+            stamps[key] = h
+            stamp_file.parent.mkdir(parents=True, exist_ok=True)
+            stamp_file.write_text(json.dumps(stamps, indent=1, sort_keys=True))
+        report.append(f"IMAGE {img.name} -> RP/{rule[0]}" + (" (black background removed)" if clear_bg else ""))
     for ic in sorted(SRC.glob("pack_icon.*")):
         out = RP / "pack_icon.png"
         h = sha(ic)

@@ -1,0 +1,64 @@
+{
+  "format_version": "1.10.0",
+  "animation_controllers": {
+    "controller.animation.aot.attack_titan": {
+      "initial_state": "default",
+      "states": {
+        "default": {
+          "animations": [],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "spawn": "q.property('aot:state') == 3"
+            },
+            {
+              "attack1": "q.property('aot:state') == 1"
+            },
+            {
+              "walk": "q.ground_speed > 0.1"
+            }
+          ]
+        },
+        "walk": {
+          "animations": [
+            "walk"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "spawn": "q.property('aot:state') == 3"
+            },
+            {
+              "attack1": "q.property('aot:state') == 1"
+            },
+            {
+              "default": "q.ground_speed < 0.05"
+            }
+          ]
+        },
+        "attack1": {
+          "animations": [
+            "attack1"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "default": "q.property('aot:state') == 0"
+            }
+          ]
+        },
+        "spawn": {
+          "animations": [
+            "spawn"
+          ],
+          "blend_transition": 0.2,
+          "transitions": [
+            {
+              "default": "q.property('aot:state') != 3"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

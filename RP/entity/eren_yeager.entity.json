@@ -1,0 +1,36 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "aot:eren_yeager",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/eren_yeager_marly"
+      },
+      "geometry": {
+        "default": "geometry.aot.eren_yeager_marly"
+      },
+      "animations": {
+        "walk": "animation.aot.eren_yeager_marly.walk",
+        "running": "animation.aot.eren_yeager_marly.running",
+        "punch": "animation.aot.eren_yeager_marly.bunch",
+        "main": "controller.animation.aot.eren_yeager"
+      },
+      "scripts": {
+        "scale": "1.0",
+        "animate": [
+          "main"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ],
+      "spawn_egg": {
+        "base_color": "#4a3a2a",
+        "overlay_color": "#2e6b3a"
+      }
+    }
+  }
+}
