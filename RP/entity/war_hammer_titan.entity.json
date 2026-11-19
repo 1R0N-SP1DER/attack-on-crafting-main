@@ -1,0 +1,38 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "aot:war_hammer_titan",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/war_hammer_titan"
+      },
+      "geometry": {
+        "default": "geometry.aot.war_hammer_titan"
+      },
+      "animations": {
+        "idle": "animation.aot.war_hammer_titan.idle",
+        "walk": "animation.aot.war_hammer_titan.walk",
+        "attack1": "animation.aot.war_hammer_titan.attack1",
+        "attack2": "animation.aot.war_hammer_titan.attack2",
+        "spawn": "animation.aot.war_hammer_titan.spawn",
+        "main": "controller.animation.aot.war_hammer_titan"
+      },
+      "scripts": {
+        "scale": "2.0",
+        "animate": [
+          "main"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ],
+      "spawn_egg": {
+        "base_color": "#8a7f6a",
+        "overlay_color": "#c9bfa5"
+      }
+    }
+  }
+}
