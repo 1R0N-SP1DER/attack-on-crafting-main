@@ -1,5 +1,6 @@
 // Attack on Crafting - behavior scripts. Entity logic that JSON alone can't do.
 import { world, system, EntityDamageCause } from "@minecraft/server";
+import * as MC from "@minecraft/server";
 
 const T = 20; // ticks per second
 const DIMS = ["overworld", "nether", "the_end"];
@@ -15,6 +16,7 @@ const TITANS = {
   [WARHAMMER]: {
     spawnSeconds: 7.5, spawnFx: ["stk:t_trans4", "stk:t_trans"], spawnSound: "aot.titan_shift", lightning: false,
     cooldownSeconds: 4, sightRange: 10, strikeRange: 12, flyingDelta: 4, height: 20, radius: 3,
+    weakPoints: true, hardened: true, // hardened skin: body hits mostly bounce off, weak points take full damage
     attacks: {
       // hammer slam: 500 damage in a 5x5 area where the hammer hits the ground
       slam: { state: 1, seconds: 3.4375, impactAt: 1.875, damage: 500, forward: 9, halfX: 2.5, halfZ: 2.5, below: 2, above: 4, sound: "aot.heavy_warhammer_attack", fx: "stk:t_trans4", shake: true },
@@ -23,7 +25,7 @@ const TITANS = {
     },
   },
   [ATTACK]: {
-    spawnSeconds: 9.2, spawnFx: ["stk:t_trans4", "stk:t_trans"], spawnSound: "aot.titan_shift", lightning: true,
+    spawnSeconds: 9.2, spawnFx: ["stk:t_trans4", "stk:t_trans"], spawnSound: "aot.titan_shift", lightning: false, // lightning set the titan on fire, so it stays off
     cooldownSeconds: 2, sightRange: 12, strikeRange: 6, flyingDelta: 99, height: 11.5, radius: 1.75,
     weakPoints: true,
     attacks: {
@@ -43,6 +45,8 @@ const WEAK = {
   slowSeconds: 10,           // one heel cut: slowed
   kneelSeconds: 20,          // both heels cut: kneels (frozen)
   healPerSecond: 50,         // titans heal quickly so nothing but a nape hit kills
+  hardenedBounce: 0.9,       // hardened titans (Warhammer): this share of body-hit damage is healed back
+  hardenedNapeBonus: 2,      // hardened titans: nape hits do this many times damage
 };
 
 // Debug: draws the weak-point zones as bright red dots around titans that have them.
@@ -57,8 +61,10 @@ system.afterEvents.scriptEventReceive.subscribe((ev) => {
 function drawZones() {
   if (!DEBUG_ZONES) return;
   for (const dn of DIMS) {
-    for (const t of safe(() => dimOf(dn).getEntities({ type: ATTACK })) ?? []) {
-      const cfg = TITANS[ATTACK], c = t.location, r = cfg.radius + 0.6;
+    for (const t of safe(() => dimOf(dn).getEntities({ families: ["aot_titan"] })) ?? []) {
+      const cfg = TITANS[t.typeId];
+      if (!cfg?.weakPoints) continue;
+      const c = t.location, r = cfg.radius + 0.6;
       const yaw = (t.getRotation().y * Math.PI) / 180;
       const fwd = { x: -Math.sin(yaw), z: Math.cos(yaw) }, rgt = { x: -fwd.z, z: fwd.x };
       const dot = (deg, f) => {
@@ -224,7 +230,7 @@ world.afterEvents.entityHurt.subscribe((ev) => {
       else if (f <= WEAK.heelMax && front < 0.4) zone = side < 0 ? "heelL" : "heelR";
     }
   }
-  if (zone === "nape" && ev.damage >= WEAK.napeKillDamage) {
+  if (zone === "nape" && !cfg.hardened && ev.damage >= WEAK.napeKillDamage) {
     safe(() => titan.kill()); // critical nape hit: the titan dies, no steam
     return;
   }
@@ -232,7 +238,11 @@ world.afterEvents.entityHurt.subscribe((ev) => {
   steamAt(titan.dimension, where, zone ? 2 : 1);
   if (!cfg.weakPoints) return;
   // everything else is healed back; weak-point side effects:
-  if (h) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + ev.damage)));
+  if (h) {
+    if (!cfg.hardened) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + ev.damage)));
+    else if (!zone) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + ev.damage * WEAK.hardenedBounce)));
+    else if (zone === "nape") safe(() => h.setCurrentValue(Math.max(1, h.currentValue - ev.damage * (WEAK.hardenedNapeBonus - 1))));
+  }
   const now = system.currentTick;
   if (zone === "eyes") {
     busyUntil.set(titan.id, now + secs(WEAK.stunSeconds));
@@ -337,20 +347,20 @@ const FORM = {
     id: 1, serum: "aot:warhammer_serum", spawnSeconds: 7.5, ejectSeconds: 6,
     holdSneakTicks: 60,                       // hold sneak this long to eject
     healPerSecond: 4,                         // shifters heal fast, with steam
-    // placeholder survivability: health boost + resistance (tune freely)
-    effects: [["health_boost", 49], ["resistance", 2], ["jump_boost", 2], ["speed", 1]],
+    damageTaken: 0.1,                         // share of damage actually taken in titan form (rest is healed back)
     slam: { state: 2, seconds: 3.4375, impactAt: 1.875, damage: 500, halfX: 2.5, halfZ: 2.5, below: 2, above: 4, sound: "aot.heavy_warhammer_attack", fx: "stk:t_trans4", shake: true },
     cooldownSeconds: 4,
   },
 };
-const FOREVER = 20000000;
 const formOf = (p) => safe(() => p.getProperty("aot:form")) ?? 0;
 const setPhase = (p, v) => safe(() => p.setProperty("aot:phase", v));
 const sneakTicks = new Map();
 const formCooldown = new Map();
 
-function addFormEffects(p, f, ticks) {
-  for (const [name, amp] of f.effects) safe(() => p.addEffect(name, ticks, { amplifier: amp, showParticles: false }));
+// no potion effects on shifters: movement is locked with input permissions instead
+function lockMovement(p, ticks) {
+  safe(() => p.inputPermissions.setPermissionCategory(MC.InputPermissionCategory.Movement, false));
+  system.runTimeout(() => safe(() => p.inputPermissions.setPermissionCategory(MC.InputPermissionCategory.Movement, true)), ticks);
 }
 
 function shiftIn(p, f) {
@@ -359,8 +369,7 @@ function shiftIn(p, f) {
   setPhase(p, 1);
   const ticks = secs(f.spawnSeconds);
   fx(p.dimension, p.location, ["stk:t_trans4", "stk:t_trans"], "aot.titan_shift", false);
-  freeze(p, ticks);
-  addFormEffects(p, f, FOREVER);
+  lockMovement(p, ticks);
   formCooldown.set(p.id, system.currentTick + ticks);
   system.runTimeout(() => { if (p.isValid && formOf(p) === f.id) setPhase(p, 0); }, ticks);
 }
@@ -368,11 +377,10 @@ function shiftIn(p, f) {
 function eject(p, f) {
   if (formOf(p) !== f.id || safe(() => p.getProperty("aot:phase")) === 3) return;
   setPhase(p, 3);
-  freeze(p, secs(f.ejectSeconds));
+  lockMovement(p, secs(f.ejectSeconds));
   system.runTimeout(() => {
     if (!p.isValid) return;
     safe(() => p.triggerEvent("aot:warhammer_off"));
-    for (const [name] of f.effects) safe(() => p.removeEffect(name));
     steamAt(p.dimension, { x: p.location.x, y: p.location.y + 1, z: p.location.z }, 4);
   }, secs(f.ejectSeconds));
 }
@@ -415,10 +423,13 @@ system.runInterval(() => {
   }
 }, T);
 
-// shifters steam where they are hurt
+// shifters take reduced damage (healed back, no potion effects) and steam where they are hurt
 world.afterEvents.entityHurt.subscribe((ev) => {
   const p = ev.hurtEntity;
-  if (formOf(p) === 0) return;
+  const f = Object.values(FORM).find((x) => x.id === formOf(p));
+  if (!f) return;
+  const h = p.getComponent("minecraft:health");
+  if (h) safe(() => h.setCurrentValue(Math.min(h.effectiveMax, h.currentValue + ev.damage * (1 - f.damageTaken))));
   steamAt(p.dimension, { x: p.location.x, y: p.location.y + 10, z: p.location.z }, 2);
 }, { entityTypes: ["minecraft:player"] });
 
@@ -451,5 +462,5 @@ world.afterEvents.entityHitEntity.subscribe((ev) => {
 world.afterEvents.playerSpawn.subscribe((ev) => {
   if (ev.initialSpawn || formOf(ev.player) === 0) return;
   safe(() => ev.player.triggerEvent("aot:warhammer_off"));
-  for (const f of Object.values(FORM)) for (const [name] of f.effects) safe(() => ev.player.removeEffect(name));
+  safe(() => ev.player.inputPermissions.setPermissionCategory(MC.InputPermissionCategory.Movement, true));
 });
