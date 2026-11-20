@@ -28,6 +28,10 @@
       "aot:warhammer_form": {
         "minecraft:scale": {
           "value": 11.0
+        },
+        "minecraft:collision_box": {
+          "width": 6.6,
+          "height": 19.8
         }
       }
     },

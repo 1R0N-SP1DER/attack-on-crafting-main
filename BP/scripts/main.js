@@ -347,6 +347,7 @@ const FORM = {
     id: 1, serum: "aot:warhammer_serum", spawnSeconds: 7.5, ejectSeconds: 6,
     holdSneakTicks: 60,                       // hold sneak this long to eject
     healPerSecond: 4,                         // shifters heal fast, with steam
+    eyeHeight: 17.9, eyeForward: 2.5,         // camera: Bedrock has no eye-height setting, so a scripted camera is placed at the titan's eyes
     damageTaken: 0.1,                         // share of damage actually taken in titan form (rest is healed back)
     slam: { state: 2, seconds: 3.4375, impactAt: 1.875, damage: 500, halfX: 2.5, halfZ: 2.5, below: 2, above: 4, sound: "aot.heavy_warhammer_attack", fx: "stk:t_trans4", shake: true },
     cooldownSeconds: 4,
@@ -365,8 +366,9 @@ function lockMovement(p, ticks) {
 
 function shiftIn(p, f) {
   if (formOf(p) !== 0) return;
-  safe(() => p.triggerEvent("aot:warhammer_on"));
+  try { p.triggerEvent("aot:warhammer_on"); } catch (e) { p.sendMessage(`[AoT] titan form event failed: ${e}`); }
   setPhase(p, 1);
+  if (formOf(p) !== f.id) p.sendMessage("[AoT] aot:form did not change: the player behavior file (BP/entities/player.json) was not applied");
   const ticks = secs(f.spawnSeconds);
   fx(p.dimension, p.location, ["stk:t_trans4", "stk:t_trans"], "aot.titan_shift", false);
   lockMovement(p, ticks);
@@ -384,6 +386,31 @@ function eject(p, f) {
     steamAt(p.dimension, { x: p.location.x, y: p.location.y + 1, z: p.location.z }, 4);
   }, secs(f.ejectSeconds));
 }
+
+// scripted camera at the titan's eye height (entity scale only changes how big the model looks, not the camera)
+const camOn = new Set();
+function updateCamera(p, f) {
+  const r = p.getRotation(), yaw = (r.y * Math.PI) / 180, pitch = (r.x * Math.PI) / 180;
+  const fx = -Math.sin(yaw) * Math.cos(pitch), fz = Math.cos(yaw) * Math.cos(pitch);
+  const loc = { x: p.location.x + fx * f.eyeForward, y: p.location.y + f.eyeHeight, z: p.location.z + fz * f.eyeForward };
+  try {
+    p.camera.setCamera("minecraft:free", { location: loc, rotation: { x: r.x, y: r.y } });
+    camOn.add(p.id);
+  } catch (e) {
+    if (!camOn.has("err" + p.id)) { camOn.add("err" + p.id); p.sendMessage(`[AoT] camera failed: ${e}`); }
+  }
+}
+function clearCamera(p) {
+  if (!camOn.has(p.id)) return;
+  camOn.delete(p.id);
+  safe(() => p.camera.clear());
+}
+system.runInterval(() => {
+  for (const p of world.getAllPlayers()) {
+    const f = Object.values(FORM).find((x) => x.id === formOf(p));
+    if (f) updateCamera(p, f); else clearCamera(p);
+  }
+}, 1);
 
 // right-click the serum
 world.afterEvents.itemUse.subscribe((ev) => {
@@ -463,4 +490,5 @@ world.afterEvents.playerSpawn.subscribe((ev) => {
   if (ev.initialSpawn || formOf(ev.player) === 0) return;
   safe(() => ev.player.triggerEvent("aot:warhammer_off"));
   safe(() => ev.player.inputPermissions.setPermissionCategory(MC.InputPermissionCategory.Movement, true));
+  clearCamera(ev.player);
 });
