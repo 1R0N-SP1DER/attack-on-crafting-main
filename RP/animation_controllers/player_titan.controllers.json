@@ -8,7 +8,7 @@
           "animations": [
             "aot_wh_idle"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "spawn": "q.property('aot:phase') == 1"
@@ -28,7 +28,7 @@
           "animations": [
             "aot_wh_walk"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "spawn": "q.property('aot:phase') == 1"
@@ -48,7 +48,7 @@
           "animations": [
             "aot_wh_spawn"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "idle": "q.property('aot:phase') != 1"
@@ -59,7 +59,7 @@
           "animations": [
             "aot_wh_attack1"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "idle": "q.property('aot:phase') != 2"
@@ -70,7 +70,7 @@
           "animations": [
             "aot_wh_eject"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "idle": "q.property('aot:phase') != 3"

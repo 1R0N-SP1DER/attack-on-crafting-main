@@ -5,8 +5,7 @@
       "initial_state": "default",
       "states": {
         "default": {
-          "animations": [],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "punch": "q.property('aot:state') == 1"
@@ -23,7 +22,7 @@
           "animations": [
             "walk"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "punch": "q.property('aot:state') == 1"
@@ -40,7 +39,7 @@
           "animations": [
             "running"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "punch": "q.property('aot:state') == 1"
@@ -54,7 +53,7 @@
           "animations": [
             "punch"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "default": "q.property('aot:state') == 0"

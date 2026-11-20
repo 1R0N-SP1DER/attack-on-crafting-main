@@ -22,6 +22,13 @@ def slug(s):
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
 
 
+def bname(n):
+    if " " not in n.strip():
+        return n.strip()
+    parts = n.split()
+    return parts[0].lower() + "".join(w.capitalize() for w in parts[1:])
+
+
 def num(v):
     return round(float(v), 5)
 
@@ -50,7 +57,7 @@ def build_geo(d, ident):
         o, t = e["from"], e["to"]
         infl = e.get("inflate", 0) or 0
         c = {
-            "origin": [num(-t[0] - 0 + infl), num(o[1] - infl), num(o[2] - infl)],
+            "origin": [num(-t[0] - infl), num(o[1] - infl), num(o[2] - infl)],
             "size": [num(t[0] - o[0]), num(t[1] - o[1]), num(t[2] - o[2])],
         }
         if infl:
@@ -83,7 +90,7 @@ def build_geo(d, ident):
                 if n in elements:
                     cubes.append(cube_json(elements[n], None))
             else:
-                name = n["name"]
+                name = bname(n["name"])
                 bone = {"name": name, "pivot": [num(-n["origin"][0]), num(n["origin"][1]), num(n["origin"][2])]}
                 if parent:
                     bone["parent"] = parent
@@ -122,7 +129,7 @@ def group_names(d):
     def walk(nodes):
         for n in nodes:
             if isinstance(n, dict):
-                out[n["uuid"]] = n["name"]
+                out[n["uuid"]] = bname(n["name"])
                 walk(n.get("children", []))
     walk(d["outliner"])
     return out
@@ -295,6 +302,9 @@ def patch_player(report):
         d["animations"][f"aot_wh_{k}"] = f"animation.aot.war_hammer_titan.{k}"
     d["animations"]["aot_titan_ctrl"] = "controller.animation.aot.player_titan"
     d["scripts"]["scale"] = f"q.property('aot:form') == 1 ? {TITAN_RENDER:.4f} : 0.9375"
+    init = d["scripts"].setdefault("initialize", [])
+    if not any("melee_spear_equipped" in x for x in init):
+        init.append("variable.melee_spear_equipped = 0.0;")  # game-side animations expect it; the sample file predates it
     d["scripts"].setdefault("animate", []).append({"aot_titan_ctrl": "q.property('aot:form') == 1"})
     rcs = []
     for rc in d["render_controllers"]:

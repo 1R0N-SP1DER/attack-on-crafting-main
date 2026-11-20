@@ -8,7 +8,7 @@
           "animations": [
             "idle"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "shifting": "q.property('aot:state') == 1"
@@ -25,7 +25,7 @@
           "animations": [
             "walk"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "shifting": "q.property('aot:state') == 1"
@@ -42,7 +42,7 @@
           "animations": [
             "shifting"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "default": "q.property('aot:state') == 0"
@@ -53,7 +53,7 @@
           "animations": [
             "death"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "default": "q.property('aot:state') == 0"

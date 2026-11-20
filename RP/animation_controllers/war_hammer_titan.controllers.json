@@ -8,7 +8,7 @@
           "animations": [
             "idle"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "spawn": "q.property('aot:state') == 3"
@@ -28,7 +28,7 @@
           "animations": [
             "walk"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "spawn": "q.property('aot:state') == 3"
@@ -48,7 +48,7 @@
           "animations": [
             "attack1"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "default": "q.property('aot:state') != 1"
@@ -59,7 +59,7 @@
           "animations": [
             "attack2"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "default": "q.property('aot:state') != 2"
@@ -70,7 +70,7 @@
           "animations": [
             "spawn"
           ],
-          "blend_transition": 0.2,
+          "blend_transition": 0,
           "transitions": [
             {
               "default": "q.property('aot:state') != 3"

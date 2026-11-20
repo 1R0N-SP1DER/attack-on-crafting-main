@@ -4,7 +4,7 @@
   "animation.aot.aoc_blades.3rd_person": {
    "loop": false,
    "bones": {
-    "Right Arm": {
+    "rightArm": {
      "rotation": {
       "0.0": [
        -2.5,
@@ -13,7 +13,7 @@
       ]
      }
     },
-    "Left Arm": {
+    "leftArm": {
      "rotation": {
       "0.0": [
        0,
@@ -27,7 +27,7 @@
   "animation.aot.aoc_blades.first_person": {
    "loop": false,
    "bones": {
-    "Right Arm": {
+    "rightArm": {
      "rotation": {
       "0.0": [
        10.0374230459,
@@ -43,7 +43,7 @@
       ]
      }
     },
-    "Left Arm": {
+    "leftArm": {
      "rotation": {
       "0.0": [
        10.0374230459,
